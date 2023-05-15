@@ -159,7 +159,7 @@ app.get('/admin', async function(req, res) {
   try {
     // Check if the user is an admin
     if (!req.session.user || req.session.user.userType !== 'admin') {
-      return res.status(403).send('Unauthorized');
+      res.render('unauthorized');
     }
     
     const users = await User.db.collection('users').find().toArray();

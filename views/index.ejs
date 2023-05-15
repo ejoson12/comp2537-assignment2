@@ -2,9 +2,11 @@
 
 <div class="container py-5 d-flex justify-content-center">
     <% if (isLoggedIn) { %>
-        Hello, <%= username %>.<br>
-        <a href="/members" class="btn btn-primary">Members Area</a><br>
-        <a href="/logout" class="btn btn-secondary">Logout</a>
+        <div class="text-center">
+            <h1>Hello, <%= username %>.</h1>
+            <a href="/members" class="btn btn-primary">Members Area</a><br>
+            <a href="/logout" class="btn btn-secondary">Logout</a>
+        </div>
     <% } else { %>
         <div class="text-center">
             <h1 class="mb-5">Welcome</h1>

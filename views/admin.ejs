@@ -1,0 +1,36 @@
+<%- include("templates/header") %>
+
+<h1>Admin Panel</h1>
+
+<table class="table">
+  <thead>
+    <tr>
+      <th>Username</th>
+      <th>User Type</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    <% for (let i = 0; i < users.length; i++) { %>
+      <tr>
+        <td><%= users[i].name %></td>
+        <td><%= users[i].userType %></td>
+        <td>
+          <% if (users[i].userType === 'user') { %>
+            <form method="POST" action="/admin/promote">
+              <input type="hidden" name="name" value="<%= users[i].name %>">
+              <button class="btn btn-success">Promote</button>
+            </form>
+          <% } else { %>
+            <form method="POST" action="/admin/demote">
+              <input type="hidden" name="name" value="<%= users[i].name %>">
+              <button class="btn btn-danger">Demote</button>
+            </form>
+          <% } %>
+        </td>
+      </tr>
+    <% } %>
+  </tbody>
+</table>
+
+<%- include("templates/footer") %>

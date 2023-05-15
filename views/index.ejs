@@ -1,0 +1,17 @@
+<%- include("templates/header") %>
+
+<div class="container py-5 d-flex justify-content-center">
+    <% if (isLoggedIn) { %>
+        Hello, <%= username %>.<br>
+        <a href="/members" class="btn btn-primary">Members Area</a><br>
+        <a href="/logout" class="btn btn-secondary">Logout</a>
+    <% } else { %>
+        <div class="text-center">
+            <h1 class="mb-5">Welcome</h1>
+            <a href="/signup" class="btn btn-primary">Sign up</a><br>
+            <a href="/login" class="btn btn-secondary">Log in</a>
+        </div>
+    <% } %>
+</div>
+
+<%- include("templates/footer") %>

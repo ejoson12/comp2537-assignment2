@@ -4,6 +4,11 @@ const usersSchema = new mongoose.Schema({
   name: String,
   email: String,
   password: String,
+  userType: {
+    type: String,
+    default: 'user',
+    enum: ['user', 'admin']
+  }
 }, {
   collection: 'users'
 });

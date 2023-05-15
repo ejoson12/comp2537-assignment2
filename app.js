@@ -16,6 +16,9 @@ const app = express();
 const dotenv = require('dotenv');
 dotenv.config();
 
+// Set the view engine
+app.set('view engine', 'ejs');
+
 // Connect to the users database
 mongoose.connect(`mongodb+srv://${process.env.MONGODB_USER}:${process.env.MONGODB_PASSWORD}@cluster0.lletqsu.mongodb.net/users?retryWrites=true&w=majority`, { useNewUrlParser: true, useUnifiedTopology: true });
 const userDbConnection = mongoose.connection;
@@ -38,7 +41,7 @@ app.use(session({
     cookie: {
       maxAge: 3600000, // milliseconds
     }
-  }));
+}));
 
 app.use(express.static('public'));
 
@@ -52,27 +55,16 @@ app.use((req, res, next) => {
 
 // Home page
 app.get('/', (req, res) => {
-    if (req.session.user) {
-        res.send(`Hello, ${req.session.user.name}.<br><a href="/members">Members Area</a><br><a href="/logout">Logout</a>`);
-    } else {
-        res.send('<a href="/signup">Sign up</a><br><a href="/login">Log in</a>');
-    }
+  if (req.session.user) {
+    res.render('index', { username: req.session.user.name, isLoggedIn: true });
+  } else {
+    res.render('index', { isLoggedIn: false });
+  }
 });
 
 // Sign up page
 app.get('/signup', (req, res) => {
-  res.send(`
-      <form method="post" action="/signup">
-          <label for="name">Name:</label>
-          <input type="text" name="name" required><br>
-          <label for="email">Email:</label>
-          <input type="email" name="email" required><br>
-          <label for="password">Password:</label>
-          <input type="password" name="password" required><br>
-          <input type="submit" value="Sign up">
-      </form>
-      <a href="/login">Log in</a>
-  `);
+  res.render('signup');
 });
 
 const signUpSchema = Joi.object({
@@ -105,7 +97,7 @@ app.post('/signup', async (req, res) => {
     });
     
     await user.save();
-    req.session.user = { name: user.name , email: user.email, password: user.password};
+    req.session.user = { name: user.name , email: user.email, password: user.password, userType: user.userType};
     res.redirect('/members');
     
   } catch (error) {
@@ -116,16 +108,7 @@ app.post('/signup', async (req, res) => {
 
 // Log in page
 app.get('/login', (req, res) => {
-    res.send(`
-        <form method="POST" action="/login">
-            <label for="email">Email:</label>
-            <input type="email" name="email" required><br>
-            <label for="password">Password:</label>
-            <input type="password" name="password" required><br>
-            <input type="submit" value="Log in">
-        </form>
-        <a href="/signup">Sign up</a>
-    `);
+  res.render('login');
 });
 
 const loginSchema = Joi.object({
@@ -134,44 +117,90 @@ const loginSchema = Joi.object({
 });
 
 app.post('/login', async (req, res) => {
-    var email = req.body.email;
-    var password = req.body.password;
+  var email = req.body.email;
+  var password = req.body.password;
 
-    const { error } = loginSchema.validate({ email, password });
-    if (error) {
-      throw new Error(error.details[0].message);
-    }
+  const { error } = loginSchema.validate({ email, password });
+  if (error) {
+    throw new Error(error.details[0].message);
+  }
 
-    if (!email || !password) {
-      res.send('Please provide all fields. <a href="/login">Try again</a>');
-    } else {
-      try {
-        const user = await User.findOne({ email });
-        if (!user) {
-          res.send('Email or password is incorrect. <a href="/login">Try again</a>');
+  if (!email || !password) {
+    res.send('Please provide all fields. <a href="/login">Try again</a>');
+  } else {
+    try {
+      const user = await User.findOne({ email });
+      if (!user) {
+        res.send('Email or password is incorrect. <a href="/login">Try again</a>');
+      } else {
+        const match = await bcrypt.compare(password, user.password);
+        if (match) {
+          req.session.user = { id: user._id, name: user.name, email: user.email, userType: user.userType };
+          res.redirect('/members');
         } else {
-          const match = await bcrypt.compare(password, user.password);
-          if (match) {
-            req.session.user = { id: user._id, name: user.name , email: user.email, password: user.password};
-            res.redirect('/members');
-          } else {
-            res.send('Email or password is incorrect. <a href="/login">Try again</a>');
-          }
+          res.send('Email or password is incorrect. <a href="/login">Try again</a>');
         }
-      } catch (err) {
-        res.send('An error occurred. <a href="/login">Try again</a>');
       }
+    } catch (err) {
+      res.send('An error occurred. <a href="/login">Try again</a>');
     }
+  }
 });
 
+// Members page
 app.get('/members', (req, res) => {
-    const randomImageNumber = Math.floor(Math.random() * 3) + 1;
-    res.send(`
-        <h1>Hello, ${req.session.user.name}.</h1>
-        <img src="image0${randomImageNumber}.png" />
-        <a href="/logout">Log out</a>
-    `);
-  });
+  res.render('members', { user: req.session.user });
+});
+
+// Admin page
+app.get('/admin', async function(req, res) {
+  User.db = userDbConnection;
+
+  try {
+    // Check if the user is an admin
+    if (!req.session.user || req.session.user.userType !== 'admin') {
+      return res.status(403).send('Unauthorized');
+    }
+    
+    const users = await User.db.collection('users').find().toArray();
+    res.render('admin', { users });
+  } catch (err) {
+    console.error(err);
+    res.sendStatus(500);
+  }
+});
+
+app.post('/admin/promote', async (req, res) => {
+  User.db = userDbConnection;
+  var name = req.body.name;
+
+  try {
+    const user = await User.findOne({ name });
+    if (!user) throw new Error('User not found');
+    user.userType = 'admin';
+    await user.save();
+    res.redirect('/admin');
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Internal Server Error');
+  }
+});
+
+app.post('/admin/demote', async (req, res) => {
+  User.db = userDbConnection;
+  var name = req.body.name;
+
+  try {
+    const user = await User.findOne({ name });
+    if (!user) throw new Error('User not found');
+    user.userType = 'user';
+    await user.save();
+    res.redirect('/admin');
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Internal Server Error');
+  }
+});
 
 //Logout page
 app.get('/logout', (req, res) => {
@@ -183,7 +212,7 @@ app.get('/logout', (req, res) => {
 
 // 404 page
 app.get('*', (req, res) => {
-    res.status(404).send('404 - Page not found');
+    res.status(404).render('404');
 });
 
 main().catch(err => console.log(err));
